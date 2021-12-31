@@ -1,0 +1,198 @@
+type: install
+name: Elastic Beats Add-on
+id: elasticbeats-multiple
+
+logo: https://raw.githubusercontent.com/jelastic-jps/beats-jps-addon/main/elastic-beats.png
+description:
+  short: 'Elastic Beats: Lightweight data shippers'
+  text: |
+    Beats is a free and open platform for single-purpose data shippers. They send data from nodes of your environments to Logstash or OpenSearch (Elasticsearch).
+homepage: https://www.elastic.co/beats/
+
+baseUrl: https://raw.githubusercontent.com/jelastic-jps/beats-jps-addon/main/
+
+settings:
+  fields:
+    - type: checkboxlist
+      caption: Installed Agents
+      name: options
+      columns: 2
+      values:
+        - name: filebeat
+          caption: Filebeat
+          value: true
+
+        - name: journalbeat
+          caption: Journalbeat
+          value: false
+          
+        - name: packetbeat
+          caption: Packetbeat
+          value: false
+
+        - name: metricbeat
+          caption: Metribeat
+          value: false
+
+        - name: heartbeat
+          caption: Heartbeat
+          value: false
+          
+    - type: list
+      name: beatsossversion
+      caption: Beats OSS Version
+      values:
+        7.12.1: 7.12.1
+        latest: latest
+      default: 7.12.1
+      hideLabel: false
+      hidden: false
+        
+    - type: spacer
+
+    - type: string
+      name: opensearchHost
+      caption: OpenSearch Host
+      placeholder: 0.0.0.0:9200
+      tooltip: Optional parameter: IP or host with port (9200 by default) of the OpenSearch node. Only provide if data is put directly through the OpenSearch API.
+      required: false
+      
+    - type: compositefield
+      caption: Credentials
+      tooltip: Optional parameters: username and password credentials for connecting to the OpenSearch and OpenSearch Dashboards nodes.
+      defaultMargins: 0 10 0 0
+      items:
+        - type: displayfield
+          cls: x-form-item-label
+          value: User
+          width: 30
+        
+        - type: string
+          name: opensearchUser
+          placeholder: OpenSearch username
+          width: 180
+            
+        - type: displayfield
+          cls: x-form-item-label
+          value: Password
+          width: 60
+
+        - type: string
+          name: opensearchPassword
+          placeholder: password
+          inputType: password
+          width: 153
+          
+    - type: string
+      name: apiKey
+      caption: API Key
+      tooltip: Optional parameter: API key for connecting to the OpenSearch and OpenSearch Dashboards nodes. Only provide if username and password are not set. 
+      placeholder: id:api_key
+      required: false
+          
+    - type: string
+      name: osearchdashboardHost
+      caption: OpenSearch Dashboards Host
+      tooltip: Optional parameter: IP or host with port (80 by default) of the OpenSearch Dashboards node. The OpenSearch Dashboards component utilizes the same authentication credentials as OpenSearch.
+      placeholder: 0.0.0.0:5601
+      required: false
+      
+    - type: string
+      name: logstashHost
+      caption: Logstash Host
+      tooltip: Optional parameter: IP or host with port (5044 by default) of the Logstash node. Only provide if data is put through the Logstash component. Credentials are not needed for the Logstash output.
+      placeholder: 0.0.0.0:5044
+      required: false
+          
+    - type: spacer
+
+    - type: list
+      name: envName
+      caption: Environment
+      required: true
+      values: []
+
+    - type: radiolist
+      caption: Nodes
+      name: mode
+      columns: 3
+      value: allNodeGroups
+      values:
+        - caption: All Nodes
+          value: allNodeGroups
+
+        - caption: Specific Nodes
+          value: specificNodeGroups
+      showIf:
+        specificNodeGroups:
+          - type: list
+            name: nodeGroups
+            required: true
+            multiSelect: true
+            dependsOn:
+              envName: {}
+
+onBeforeInit: |
+  var resp = jelastic.env.control.GetEnvs();
+  if (resp.result !== 0) return resp;
+  var envs = [];
+  var nodes = {};
+
+  for (var i = 0, envInfo, env; envInfo = resp.infos[i]; i++) {
+    env = envInfo.env;
+
+    if (env.status == 1) {
+      for (var j = 0, node; node = envInfo.nodes[j]; j++) {
+        nodes[env.envName] = nodes[env.envName] || [];
+        nodes[env.envName].groups = nodes[env.envName].groups || {};
+
+        if (!nodes[env.envName].groups[node.nodeGroup])
+          nodes[env.envName].push({
+            value: node.nodeGroup,
+            caption: (node.displayName || node.name) + ' (' + node.nodeGroup + ')'
+          });
+
+        nodes[env.envName].groups[node.nodeGroup] = true;
+      }
+
+      if (nodes[env.envName] && nodes[env.envName].length > 0) {
+        envs.push({
+          value: env.envName,
+          caption: (env.displayName || env.envName)
+        });
+      }
+    }
+  }
+
+  if (envs.length > 0) {
+    jps.settings.fields[9].values = envs;
+    jps.settings.fields[9].value = envs[0].value;
+    jps.settings.fields[10].showIf.specificNodeGroups[0].dependsOn.envName = nodes;
+  }
+
+  return { result: 0, settings: jps.settings };
+
+onInstall:
+  - if ('${settings.mode}' == 'specificNodeGroups'):
+      set: { nodeGroups: '${settings.nodeGroups}' }
+  - else:
+      - env.control.GetEnvInfo:
+          envName: ${settings.envName}
+      - set: { nodeGroups: '${response.nodeGroups.join(name,)}' }
+
+  - install [${this.nodeGroups}]:
+      envName: ${settings.envName}
+      settings:
+        options: ${settings.options}
+        filebeat: ${settings.filebeat}
+        journalbeat: ${settings.journalbeat}
+        packetbeat: ${settings.packetbeat}
+        metricbeat: ${settings.metricbeat}
+        heartbeat: ${settings.heartbeat}
+        opensearchHost: ${settings.opensearchHost}
+        osearchdashboardHost: ${settings.osearchdashboardHost}
+        logstashHost: ${settings.logstashHost}
+        beatsossversion: ${settings.beatsossversion}
+        opensearchUser: ${settings.opensearchUser}
+        opensearchPassword: ${settings.opensearchPassword}
+      jps: manifest.yml

@@ -1,0 +1,441 @@
+type: update
+name: Elastic Beats
+id: elasticbeats
+
+logo: https://raw.githubusercontent.com/jelastic-jps/beats-jps-addon/main/elastic-beats.png
+description:
+  short: 'Elastic Beats: Lightweight data shippers'
+  text: |
+    Beats is a free and open platform for single-purpose data shippers. They send data from nodes of your environments to Logstash or OpenSearch (Elasticsearch).
+homepage: https://www.elastic.co/beats/
+
+targetNodes: any
+
+settings:
+  main:
+    fields:
+      - type: checkboxlist
+        caption: Installed Agents
+        name: options
+        columns: 2
+        values:
+          - name: filebeat
+            caption: Filebeat
+            value: true
+
+          - name: journalbeat
+            caption: Journalbeat
+            value: false
+          
+          - name: packetbeat
+            caption: Packetbeat
+            value: false
+
+          - name: metricbeat
+            caption: Metribeat
+            value: false
+
+          - name: heartbeat
+            caption: Heartbeat
+            value: false
+          
+      - type: list
+        name: beatsossversion
+        caption: Beats OSS Version
+        values:
+          7.12.1: 7.12.1
+          latest: latest
+        default: 7.12.1
+        hideLabel: false
+        hidden: false
+        
+      - caption: Optional Parameters
+        type: displayfield
+        name: displayfield
+        hidden: false
+  
+      - type: string
+        name: opensearchHost
+        caption: OpenSearch Host
+        placeholder: 0.0.0.0:9200
+        required: false
+      
+      - type: compositefield
+        caption: Credentials
+        defaultMargins: 0 10 0 0
+        items:
+          - type: displayfield
+            cls: x-form-item-label
+            value: User
+            width: 30
+        
+          - type: string
+            name: opensearchUser
+            placeholder: OpenSearch username
+            width: 180
+            
+          - type: displayfield
+            cls: x-form-item-label
+            value: Password
+            width: 60
+
+          - type: string
+            name: opensearchPassword
+            placeholder: password
+            inputType: password
+            width: 153
+        
+      - type: string
+        name: apiKey
+        caption: API Key
+        placeholder: id:api_key
+        required: false
+          
+      - type: string
+        name: osearchdashboardHost
+        caption: OpenSearch Dashboards Host
+        placeholder: 0.0.0.0:80
+        required: false
+      
+      - type: string
+        name: logstashHost
+        caption: Logstash Host
+        placeholder: 0.0.0.0:5044
+        required: false
+
+nodeGroupAlias:
+  ${targetNodes.nodeGroup}: target
+  
+buttons:
+  - caption: Configure
+    settings: main
+    action: configure
+
+onInstall:
+  - cmd [${targetNodes.nodeGroup}]: |-
+      cat /etc/issue|grep -o Alpine || true
+    user: root
+  - if (response.out == "Alpine"):
+      - stopEvent:
+          type: warning
+          message: Installation on Alpine is not supported.
+  - if ('${settings.options}' != ''):
+    - installBeats: 
+        affectedNodes: ${targetNodes.nodeGroup}
+
+onAfterRedeployContainer [target]:
+  installBeats:
+    affectedNodes: ${event.params.nodeGroup:[event.params.nodeId]}
+
+onAfterScaleOut [target]:
+  installBeats: 
+    affectedNodes: ${event.response.nodes.join(id,)}
+    
+onAfterClone:
+  - script: delete MANIFEST.id; return {result:0, jps:MANIFEST};
+  - install [${targetNodes.nodeGroup}]: ${response.jps}
+    envName: ${event.response.env.envName}
+    settings:
+      options: ${settings.options}
+      filebeat: ${settings.filebeat}
+      journalbeat: ${settings.journalbeat}
+      packetbeat: ${settings.packetbeat}
+      metricbeat: ${settings.metricbeat}
+      heartbeat: ${settings.heartbeat}
+      opensearchHost: ${settings.opensearchHost}
+      osearchdashboardHost: ${settings.osearchdashboardHost}
+      logstashHost: ${settings.logstashHost}
+      beatsossversion: ${settings.beatsossversion}
+      opensearchUser: ${settings.opensearchUser}
+      opensearchPassword: ${settings.opensearchPassword}
+      apiKey: ${settings.apiKey}
+
+onUninstall:
+  uninstallAllAgents
+  
+actions:
+  installBeats:
+    - if ('${settings.options}' != ''):
+      - addSigninKey
+      - createRepo
+      - if (${settings.filebeat:true}):
+          installAgent:
+            agentName: filebeat
+            affectedNodes: ${this.affectedNodes}
+            serviceConfigPath: /etc/filebeat/filebeat.yml
+          installModules:
+            agentName: filebeat
+            affectedNodes: ${this.affectedNodes}
+      - else:
+          removeAgent:
+            agentName: filebeat
+            affectedNodes: ${this.affectedNodes}
+      - if (${settings.journalbeat:true}):
+          installAgent:
+            agentName: journalbeat
+            affectedNodes: ${this.affectedNodes}
+            serviceConfigPath: /etc/journalbeat/journalbeat.yml
+      - else:
+          removeAgent:
+            agentName: journalbeat
+            affectedNodes: ${this.affectedNodes}
+      - if (${settings.packetbeat:true}):
+          installAgent:
+            agentName: packetbeat
+            affectedNodes: ${this.affectedNodes}
+            serviceConfigPath: /etc/packetbeat/packetbeat.yml
+      - else:
+          removeAgent:
+            agentName: packetbeat
+            affectedNodes: ${this.affectedNodes}
+      - if (${settings.metricbeat:true}):
+          installAgent:
+            agentName: metricbeat
+            affectedNodes: ${this.affectedNodes}
+            serviceConfigPath: /etc/metricbeat/metricbeat.yml
+          installModules:
+            agentName: metricbeat
+            affectedNodes: ${this.affectedNodes}
+      - else:
+          removeAgent:
+            agentName: metricbeat
+            affectedNodes: ${this.affectedNodes}
+      - if (${settings.heartbeat:true}):
+          installAgent:
+            agentName: heartbeat-elastic
+            affectedNodes: ${this.affectedNodes}
+            serviceConfigPath: /etc/heartbeat/heartbeat.yml
+      - else:
+          removeAgent:
+            agentName: heartbeat-elastic
+            affectedNodes: ${this.affectedNodes}
+    - else:
+        uninstallAllAgents
+        
+  installAgent:
+    - installPackage:
+        packageName: ${this.agentName}
+        affectedNodes: ${this.affectedNodes}
+    - configureService:
+        serviceConfigPath: ${this.serviceConfigPath}
+        affectedNodes: ${this.affectedNodes}
+    - fixBeatsPermissions:
+        serviceConfigPath: ${this.serviceConfigPath}
+        affectedNodes: ${this.affectedNodes}
+    - addToExtendPerm:
+        agentName: ${this.agentName}
+        affectedNodes: ${this.affectedNodes}
+    - addServiceToSudoers:
+        agentName: ${this.agentName}
+        affectedNodes: ${this.affectedNodes}
+    - removeStrictPerms:
+        agentName: ${this.agentName}
+        affectedNodes: ${this.affectedNodes}
+       
+  removeStrictPerms:
+    - if ('${this.agentName}' == 'heartbeat-elastic'):
+        - set:
+            logFolder: heartbeat
+    - if ('${this.agentName}' != 'heartbeat-elastic'):
+        - set:
+            logFolder: ${this.agentName}
+    - cmd [${targetNodes.nodeGroup}]: |-
+        sed -i 's|--path.logs /var/log/${this.logFolder}|--path.logs /var/log/${this.logFolder} --strict.perms=false|' /usr/lib/systemd/system/${this.agentName}.service
+        systemctl daemon-reload; systemctl start ${this.agentName}
+      user: root
+
+  addSigninKey:
+    cmd [${targetNodes.nodeGroup}]: |-
+      if which yum &>/dev/null; then
+          rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch
+      else
+          wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -
+      fi
+    user: root
+  
+  addToExtendPerm:
+    cmd [${this.affectedNodes}]: |-
+      grep -q "$(echo ${this.agentName}|awk -F- '{print $1}')" /etc/jelastic/extendperm.conf || sed -i "s|common |common /etc/$(echo ${this.agentName}|awk -F- '{print $1}');/var/log/$(echo ${this.agentName}|awk -F- '{print $1}');|g" /etc/jelastic/extendperm.conf;
+      if which jem; then jem filemanager extendperm; else true; fi
+    user: root
+    
+  createRepo:
+    - set:
+        body: |
+          [elastic-7.x]
+          name=Elastic repository for OSS 7.x packages
+          baseurl=https://artifacts.elastic.co/packages/oss-7.x/yum
+          gpgcheck=1
+          gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+          enabled=1
+          autorefresh=1
+          type=rpm-md
+
+    - cmd [${targetNodes.nodeGroup}]: |-
+        if which yum &>/dev/null; then 
+            echo '${this.body}' > /etc/yum.repos.d/elastic.repo
+        else
+            echo "deb https://artifacts.elastic.co/packages/oss-7.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-7.x.list; apt-get install apt-transport-https; apt update -y;
+        fi
+      user: root
+      
+  addServiceToSudoers:
+    - set:
+        body: |
+          Cmnd_Alias agent_name_SERVICE = /sbin/service ${this.agentName} *, /usr/bin/systemctl * ${this.agentName}.service, /etc/init.d/${this.agentName} *, /urs/bin/${this.agentName} *, /usr/bin/systemctl * ${this.agentName}
+          %ssh-access ALL = NOPASSWD: agent_name_SERVICE
+    - cmd [${this.affectedNodes}]: |-
+        echo '${this.body}' > /etc/sudoers.d/${this.agentName}
+        sed -i "s/agent_name/$(echo ${this.agentName}|awk -F- '{print $1}'|tr a-z A-Z)/" /etc/sudoers.d/${this.agentName}
+      user: root
+      
+  installPackage:
+    - if ('${settings.beatsossversion}' == 'latest'):
+        - cmd [${this.affectedNodes}]: |-
+            if which yum &>/dev/null; then
+              if ! rpm -qa|grep ${this.packageName}; then 
+                yum install -y ${this.packageName}
+              fi
+            else
+              if ! apt list --installed 2>/dev/null|grep -q ${this.packageName}; then
+                apt install -y ${this.packageName}
+              fi
+            fi
+          user: root
+    - else:
+        - cmd [${this.affectedNodes}]: |-
+            if which yum &>/dev/null; then
+              if ! rpm -qa|grep ${this.packageName}; then
+                yum install -y ${this.packageName}-${settings.beatsossversion}
+              fi
+            else
+              if ! apt list --installed 2>/dev/null|grep -q ${this.packageName}; then
+                 curl -L -O https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-${settings.beatsossversion}-amd64.deb && \
+                 dpkg -i filebeat-${settings.beatsossversion}-amd64.deb
+              fi
+            fi
+          user: root
+    - cmd [${this.affectedNodes}]: |-
+        systemctl enable ${this.packageName}
+      user: root  
+  
+  fixBeatsPermissions:
+    - cmd[${this.affectedNodes}]: |-
+        chmod go-w ${this.serviceConfigPath};
+      user: root
+      
+  configureService:
+    - if ('${settings.opensearchHost:}'):
+        - cmd [${this.affectedNodes}]: |-
+            sed -i 's/^#output.elasticsearch:/output.elasticsearch:/g' ${this.serviceConfigPath};
+            grep -q 'ssl.verification_mode' ${this.serviceConfigPath} || sed -i '/^output.elasticsearch/ a\  ssl.verification_mode: "none"' ${this.serviceConfigPath};
+            sed -i 's/[#]*hosts:[[:space:]]*\[".*:9200"\]/hosts: ["${settings.opensearchHost}"]/g' ${this.serviceConfigPath};
+            sed -i 's/#protocol: "https"/protocol: "https"/g' ${this.serviceConfigPath};
+          user: root
+        - if ('${settings.opensearchUser:}'):
+            - cmd [${this.affectedNodes}]: |-
+                sed -i 's/#username[[:space:]]*:/username:/g' ${this.serviceConfigPath};
+                sed -i 's/#password[[:space:]]*:/password:/g' ${this.serviceConfigPath};
+                sed -i 's/username[[:space:]]*:.*/username: "${settings.opensearchUser}"/g' ${this.serviceConfigPath};
+                sed -i 's/password[[:space:]]*:.*/password: "${settings.opensearchPassword:}"/g' ${this.serviceConfigPath};
+                sed -i 's/^[[:space:]]*api_key[[:space:]]*:.*/  #api_key: "id:api_key"/g' ${this.serviceConfigPath};
+              user: root
+        - else:
+            - cmd [${this.affectedNodes}]: |-
+                sed -i 's/^[[:space:]]*username[[:space:]]*:.*/  #username: "username"/g' ${this.serviceConfigPath};
+                sed -i 's/^[[:space:]]*password[[:space:]]*:.*/  #password: "password"/g' ${this.serviceConfigPath};
+              user: root
+            - if ('${settings.apiKey:}'):
+                cmd [${this.affectedNodes}]: |-
+                  sed -i 's/#api_key: "id:api_key"/api_key:/g' ${this.serviceConfigPath};
+                  sed -i 's/api_key[[:space:]]*:.*/api_key: "${settings.apiKey}"/g' ${this.serviceConfigPath};
+                user: root
+    - else:
+        - cmd [${this.affectedNodes}]: |-
+            sed -i 's/^[[:space:]]*output.elasticsearch:/#output.elasticsearch:/g' ${this.serviceConfigPath};
+            sed -i 's/^[[:space:]]*hosts:[[:space:]]*\[".*:9200"\]/  #hosts: ["localhost:9200"]/g' ${this.serviceConfigPath};
+            sed -i 's/[#]*output.logstash:/output.logstash:/g' ${this.serviceConfigPath};
+          user: root
+        - if ('${settings.logstashHost:}'):
+            - cmd [${this.affectedNodes}]: |-
+                sed -i 's/[#]*hosts:[[:space:]]*\[".*:5044"\]/hosts: \["${settings.logstashHost}"\]/g' ${this.serviceConfigPath};
+              user: root
+        - else:
+            - cmd [${this.affectedNodes}]: |-
+                sed -i 's/[#]*hosts:[[:space:]]*\[".*:5044"\]/#hosts: \["localhost:5044"\]/g' ${this.serviceConfigPath};
+              user: root
+    - if ('${settings.osearchdashboardHost:}'):
+        - cmd [${this.affectedNodes}]: |-
+            sed -i 's/[#]*host[[:space:]]*:.*/host: "${settings.osearchdashboardHost}"/g' ${this.serviceConfigPath};
+          user: root
+    - else:
+        - cmd [${this.affectedNodes}]: |-
+            sed -i 's/[[:space:]]*host[[:space:]]*:.*/#host: \["localhost:5061"\]/g' ${this.serviceConfigPath};
+          user: root
+    - cmd [${this.affectedNodes}]: |-
+        if which jem; then jem filemanager extendperm; else true; fi
+      user: root
+  
+  installModules:        
+    - script: |
+        var fbModules = ['system'];
+
+        var nodeTypeModules = {
+          'nginx.*': [ 'nginx' ],
+          'haproxy.*': [ 'haproxy' ],
+          'apache.*': [ 'apache' ],
+          'redis.*': [ 'redis' ],
+          'postgres.*': [ 'postgresql' ],
+          'mysql.*|mariadb.*|percona.*': [ 'mysql' ],
+          'mongo.*': [ 'mongodb' ]
+        };
+
+        for (var pattern in nodeTypeModules) {
+          if (new RegExp(pattern).test('${targetNodes.nodeType}')) {
+            fbModules = fbModules.concat(nodeTypeModules[pattern]);
+          }
+        }
+
+        return { result: 0, modules: fbModules.join(" ")};
+
+    - cmd [${this.affectedNodes}]: |-
+        chmod go-w /etc/${this.agentName}/${this.agentName}.yml
+        ${this.agentName} modules enable ${response.modules}
+        ${this.agentName} setup
+        service ${this.agentName} restart
+      user: root
+      
+  removeAgent:
+    - cmd [${this.affectedNodes}]: |-
+        service ${this.agentName} stop  
+        if which yum &>/dev/null; then
+          yum -y remove ${this.agentName};
+        else
+          apt remove -y ${this.agentName};
+        fi
+        rm -rf /etc/sudoers.d/${this.agentName} /etc/${this.agentName};
+      user: root
+  
+  configure:
+    installBeats: 
+      affectedNodes: ${targetNodes.nodeGroup}
+      
+  uninstallAllAgents:
+    - removeAgent:
+        agentName: filebeat
+        affectedNodes: ${targetNodes.nodeGroup}
+    - removeAgent:
+        agentName: journalbeat
+        affectedNodes: ${targetNodes.nodeGroup}
+    - removeAgent:
+        agentName: packetbeat
+        affectedNodes: ${targetNodes.nodeGroup}
+    - removeAgent:
+        agentName: metricbeat
+        affectedNodes: ${targetNodes.nodeGroup}
+    - removeAgent:
+        agentName: heartbeat-elastic
+        affectedNodes: ${targetNodes.nodeGroup}
+    - cmd [target]: |-
+        rm -f /etc/yum.repos.d/elastic.repo
+      user: root
