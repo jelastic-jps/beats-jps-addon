@@ -54,12 +54,12 @@ settings:
       name: opensearchHost
       caption: OpenSearch Host
       placeholder: 0.0.0.0:9200
-      tooltip: Optional parameter: IP or host with port (9200 by default) of the OpenSearch node. Only provide if data is put directly through the OpenSearch API.
+      tooltip: 'Optional parameter: IP or host with port (9200 by default) of the OpenSearch node. Only provide if data is put directly through the OpenSearch API.'
       required: false
       
     - type: compositefield
       caption: Credentials
-      tooltip: Optional parameters: username and password credentials for connecting to the OpenSearch and OpenSearch Dashboards nodes.
+      tooltip: 'Optional parameters: username and password credentials for connecting to the OpenSearch and OpenSearch Dashboards nodes.'
       defaultMargins: 0 10 0 0
       items:
         - type: displayfield
@@ -86,21 +86,21 @@ settings:
     - type: string
       name: apiKey
       caption: API Key
-      tooltip: Optional parameter: API key for connecting to the OpenSearch and OpenSearch Dashboards nodes. Only provide if username and password are not set. 
+      tooltip: 'Optional parameter: API key for connecting to the OpenSearch and OpenSearch Dashboards nodes. Only provide if username and password are not set.'
       placeholder: id:api_key
       required: false
           
     - type: string
       name: osearchdashboardHost
       caption: OpenSearch Dashboards Host
-      tooltip: Optional parameter: IP or host with port (80 by default) of the OpenSearch Dashboards node. The OpenSearch Dashboards component utilizes the same authentication credentials as OpenSearch.
+      tooltip: 'Optional parameter: IP or host with port (80 by default) of the OpenSearch Dashboards node. The OpenSearch Dashboards component utilizes the same authentication credentials as OpenSearch.'
       placeholder: 0.0.0.0:5601
       required: false
       
     - type: string
       name: logstashHost
       caption: Logstash Host
-      tooltip: Optional parameter: IP or host with port (5044 by default) of the Logstash node. Only provide if data is put through the Logstash component. Credentials are not needed for the Logstash output.
+      tooltip: 'Optional parameter: IP or host with port (5044 by default) of the Logstash node. Only provide if data is put through the Logstash component. Credentials are not needed for the Logstash output.'
       placeholder: 0.0.0.0:5044
       required: false
           
