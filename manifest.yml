@@ -413,7 +413,7 @@ actions:
         else
           apt remove -y ${this.agentName};
         fi
-        rm -rf /etc/sudoers.d/${this.agentName} /etc/${this.agentName};
+        rm -rf /etc/sudoers.d/${this.agentName} /etc/$(echo "${this.agentName}"|awk -F'-' '{print $1}');
       user: root
   
   configure:
