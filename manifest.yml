@@ -21,18 +21,23 @@ settings:
         values:
           - name: filebeat
             caption: Filebeat
+            value: true
 
           - name: journalbeat
             caption: Journalbeat
+            value: false
           
           - name: packetbeat
             caption: Packetbeat
+            value: false
 
           - name: metricbeat
             caption: Metribeat
+            value: false
 
           - name: heartbeat
             caption: Heartbeat
+            value: false
           
       - type: list
         name: beatsossversion
