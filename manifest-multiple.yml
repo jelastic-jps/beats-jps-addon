@@ -65,23 +65,23 @@ settings:
         - type: displayfield
           cls: x-form-item-label
           value: User
-          width: 30
+          width: 32
         
         - type: string
           name: opensearchUser
           placeholder: OpenSearch username
-          width: 180
+          width: 178
             
         - type: displayfield
           cls: x-form-item-label
           value: Password
-          width: 60
+          width: 55
 
         - type: string
           name: opensearchPassword
           placeholder: password
           inputType: password
-          width: 153
+          width: 148
           
     - type: string
       name: apiKey
