@@ -90,6 +90,7 @@ settings:
         caption: API Key
         placeholder: id:api_key
         required: false
+        hidden: true
           
       - type: string
         name: osearchdashboardHost
