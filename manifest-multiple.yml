@@ -89,6 +89,7 @@ settings:
       tooltip: 'Optional parameter: API key for connecting to the OpenSearch and OpenSearch Dashboards nodes. Only provide if username and password are not set.'
       placeholder: id:api_key
       required: false
+      hidden: true
           
     - type: string
       name: osearchdashboardHost
